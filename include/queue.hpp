@@ -4,35 +4,48 @@ extern "C"
 {
 #include <libavutil/frame.h>
 #include <libavutil/fifo.h>
+#include <libavcodec/packet.h>
 }
 
 #include <condition_variable>
 
-struct PacketQueue
+struct Packet
 {
-    AVFifo* queue;
-    int     size;
-    int     capacity;
-    int64_t duration;       // TODO: just like Frame::pos, it can be nagative?
-    bool    abort_request;  // use for pause and seek
+    AVPacket* packet;
+    int       serial; // serial number of packet
+};
+
+class PacketQueue
+{
+public:
+    int init();
+    void destroy();
+
+private:
+    AVFifo* _queue; 
+    int     _size;       
+    int     _capacity;     
+    int64_t _duration;      // TODO: just like Frame::pos, it can be nagative?
+    bool    _abort_request; // use for pause and seek
+public:
     int     serial;         // TODO: serial number of stream?
 
-    std::mutex              mutex;
-    std::condition_variable cond;
+    std::mutex              _mutex;
+    std::condition_variable _cond;
 };
 
 struct Frame
 {
-    AVFrame* frame    = nullptr;
-    int      serial   = 0;       // serial number of the frame
-    double   pts      = 0.0;     // presentation timestamp for the frame 
-    double   duration = 0.0;     // estimated duration of the frame
-    int64_t  pos      = 0;       // byte position of the frame in the input file  
-                                 // TODO: does pos can be negative?
+    AVFrame* frame; 
+    int      serial;   // serial number of the frame
+    double   pts;      // presentation timestamp for the frame 
+    double   duration; // estimated duration of the frame
+    int64_t  pos;      // byte position of the frame in the input file  
+                       // TODO: does pos can be negative?
 
-    bool     uploaded_to_gpu = false; // whether uploaded to gpu use hardware acceleration
-                                      // TODO: it be used? if not used,
-                                      //       maybe I can try the hardware acceleration
+    bool     uploaded_to_gpu; // whether uploaded to gpu use hardware acceleration
+                              // TODO: it be used? if not used,
+                              //       maybe I can try the hardware acceleration
 };
 
 template <int Frame_Queue_Capacity>
@@ -60,7 +73,7 @@ public:
         return 0;
     }
 
-    void release() const noexcept
+    void destroy() const noexcept
     {
         for (int i = 0; i < Frame_Queue_Capacity; ++i)
         {
@@ -72,15 +85,15 @@ public:
 
 private:
     Frame _queue[Frame_Queue_Capacity];
-    int   _read_index    = 0;
-    int   _write_index   = 0;
-    int   _size          = 0;
-    int   _capacity      = 0;
-    bool  _keep_last     = false;
-    int   _playing_index = 0;
+    int   _read_index;
+    int   _write_index;
+    int   _size;
+    int   _capacity;
+    bool  _keep_last;
+    int   _playing_index;
 
     std::mutex              _mutex;
     std::condition_variable _cond;
 
-    PacketQueue* _packet_queue = nullptr;
+    PacketQueue* _packet_queue;
 };
