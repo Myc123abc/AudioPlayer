@@ -113,7 +113,7 @@ int read_thread(AudioContext* ac)
 {
     // alloc packet
     AVPacket* pkt = av_packet_alloc();
-    // FIXME should I directly exit? like ffplay if use event to handle error exit case
+    // FIXME: should I directly exit? like ffplay if use event to handle error exit case
     exit_if(!pkt, "read_thread: packet_alloc failed: low memory");
 
     // alloc format context
@@ -157,11 +157,13 @@ int read_thread(AudioContext* ac)
 
     if (fc->pb)
     {
-        fc->pb->eof_reached = 0; // FIXME hack, ffplay maybe should not use avio_feof() to test for the end
+        fc->pb->eof_reached = 0; // FIXME: hack, ffplay maybe should not use avio_feof() to test for the end
     }
 
     ac->max_frame_duration = (fc->iformat->flags & AVFMT_TS_DISCONT) ? 10.0 : 3600.0; 
 
+    // here can use metadata, only title here,
+    // you can also use other key to get data such as date, album, etc
     AVDictionaryEntry* entry;
     entry = av_dict_get(fc->metadata, "title", nullptr, 0);
     if (entry)
@@ -193,6 +195,7 @@ int read_thread(AudioContext* ac)
     // open stream
     exit_if(stream_component_open(ac, audio_stream), "read_thread: open stream error");
 
+    // TODO: loop decode audio
 
     avformat_close_input(&fc);
     av_packet_free(&pkt);
@@ -212,7 +215,8 @@ int main()
     // Initialize AudioContext
     //
     ac->filename = 
-    "D:/music/四季ノ唄.mp3";
+    // "D:/music/四季ノ唄.mp3";
+    "/home/myc/music/四季ノ唄.mp3";
     // "D:/music/野良猫/信千奈　～yo～.ogg";
     ac->start_time = 3 * AV_TIME_BASE;
 
@@ -224,6 +228,8 @@ int main()
 
     ac->read_thread = std::jthread(read_thread, ac);
 
+    
+    // TODO: event loop
 
 
     //
