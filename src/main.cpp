@@ -1,6 +1,9 @@
 #include "queue.hpp"
 #include "util.hpp"
 #include "Clock.hpp"
+#include <libavcodec/defs.h>
+#include <libavutil/channel_layout.h>
+#include <libavutil/samplefmt.h>
 
 extern "C"
 {
@@ -48,6 +51,10 @@ struct AudioContext
     int64_t start_time = AV_NOPTS_VALUE; // TODO: int64_t? really? It is use for adjust pos before playing
 
     int last_audio_stream = -1;
+
+    int sample_rate = 0;
+    AVChannelLayout ch_layout;
+    AVSampleFormat sample_format;
 };
 
 int decode_interrupt_callback(void* ptr)
@@ -100,6 +107,21 @@ int stream_component_open(AudioContext* ac, int stream_index)
             exit_if(true, "Only support audio stream");
     }
     cc->codec_id = decoder->id;
+
+    // open codec
+    ret = avcodec_open2(cc, decoder, nullptr);
+    if (ret < 0) goto fail;
+    
+    // discard useless packet
+    fc->streams[stream_index]->discard = AVDISCARD_DEFAULT; 
+    
+    // get sample rate, channel layout, sample format
+    ac->sample_rate = cc->sample_rate;
+    ret = av_channel_layout_copy(&ac->ch_layout, &cc->ch_layout);
+    if (ret < 0) goto fail;
+    ac->sample_format = cc->sample_fmt;
+
+    
 
 fail:
     // release codec context
@@ -218,7 +240,7 @@ int main()
     // "D:/music/四季ノ唄.mp3";
     "/home/myc/music/四季ノ唄.mp3";
     // "D:/music/野良猫/信千奈　～yo～.ogg";
-    ac->start_time = 3 * AV_TIME_BASE;
+    // ac->start_time = 3 * AV_TIME_BASE; // FIXME: Why it is 3 x AV_TIME_BASE? How can I get correct start time.
 
     exit_if(ac->packet_queue.init() < 0, "packet queue init failed: low memory");
     exit_if(ac->frame_queue.init(&ac->packet_queue, true) < 0, "frame queue init failed: low memory");
